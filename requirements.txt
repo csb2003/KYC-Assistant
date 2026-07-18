@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+langchain-groq
+langchain-classic
+langchain-community
+langchain-huggingface
+langchain-core
+faiss-cpu
+pypdf
+nest-asyncio
+pyngrok
+langgraph
+python-dotenv
+sentence-transformers
