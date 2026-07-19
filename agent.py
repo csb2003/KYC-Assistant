@@ -1,8 +1,7 @@
 import os
-import argparse
-import sys
 from typing import TypedDict, List
 from dotenv import load_dotenv
+from langchain_tavily import TavilySearch
 
 # Import LangChain and LangGraph modules
 from langchain_community.document_loaders import PyPDFLoader
@@ -25,6 +24,7 @@ llm = ChatGroq(
 
 print("LLM ready")
 
+tavily_search = TavilySearch(max_results=3)
 
 # Load the PDF----------------------------------------------------------------
 loader = PyPDFLoader("data/RBIs-Master-Direction-KYC-Direction-2016_compressed.pdf")
@@ -72,7 +72,8 @@ qa_prompt = ChatPromptTemplate.from_messages([
     ("system",
      """Use the given context to answer the question.
      You are a helpful KYC assistant.
-     If you don't know the answer, say you don't know.
+     If the answer is not found in the context, respond with exactly: "IDK"
+     Do not make up answers.
      Context: {context}"""),
 
     MessagesPlaceholder("chat_history"),
@@ -94,6 +95,7 @@ class AgentState(TypedDict):
     answer: str
     chat_history:List
 
+#node 1
 def check_scope(state:AgentState):
     question = state["question"]
     system_prompt = """You are a helpful assistant.
@@ -108,6 +110,7 @@ def check_scope(state:AgentState):
     ])
     return {"answer": response.content, "question": question}
 
+#node 2
 def retrieve_and_answer(state:AgentState):
     question = state["question"]
     chat_history = state["chat_history"]
@@ -117,17 +120,39 @@ def retrieve_and_answer(state:AgentState):
     })
     return {"answer": response["answer"],"chat_history": chat_history + [HumanMessage(content= question),AIMessage(content= response["answer"])]}
 
+#node 3
 def ask_clarification(state: AgentState):
   print("ask_clarification node")
   return {"answer": f"Could you give me more details about: '{state['question']}'?"}
 
 
-#conditional edge function
+#node 4
+def web_search(state: AgentState):
+    question = state["question"]
+    results = tavily_search.invoke(question)
+    
+    if results["answer"]:
+        return {"answer": results["answer"]}
+    
+    # fallback to top result content
+    top_results = results["results"]
+    if top_results:
+        combined = "\n".join([r["content"] for r in top_results[:2]])
+        return {"answer": combined}
+    
+    return {"answer": "No results found from web search."}
+
+
+#conditional edge functions-
 def clarify(state: AgentState):
     if "IRRELEVANT" in state["answer"]:
         return "ask_clarification"
     return "retrieve_and_answer"
 
+def should_web_search(state: AgentState):
+    if "IDK" in state["answer"]:
+        return "web_search"
+    return END
 
 #build graph
 builder = StateGraph(AgentState)
@@ -135,10 +160,13 @@ builder.set_entry_point("check_scope")
 builder.add_node("check_scope",check_scope)
 builder.add_node("ask_clarification",ask_clarification)
 builder.add_node("retrieve_and_answer",retrieve_and_answer)
+builder.add_node("web_search",web_search)
 
-builder.add_edge("retrieve_and_answer",END)
 builder.add_edge("ask_clarification", END)
+builder.add_edge("web_search",END)
 builder.add_conditional_edges("check_scope",clarify)
+builder.add_conditional_edges("retrieve_and_answer",should_web_search)
+
 
 workflow = builder.compile()
             
