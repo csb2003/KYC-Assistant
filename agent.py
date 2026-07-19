@@ -133,15 +133,30 @@ def web_search(state: AgentState):
     results = tavily_search.invoke(question)
     
     if results["answer"]:
-        return {"answer": results["answer"]}
+        raw = results["answer"]
+    elif results["results"]:
+        raw = "\n".join([r["content"] for r in results["results"][:2]])
+    else:
+        return {"answer": "No results found from web search."}
     
-    # fallback to top result content
-    top_results = results["results"]
-    if top_results:
-        combined = "\n".join([r["content"] for r in top_results[:2]])
-        return {"answer": combined}
-    
-    return {"answer": "No results found from web search."}
+    # Pass through LLM to clean up
+    response = llm.invoke([
+        HumanMessage(content=f"""
+        You are a precise information cleanup assistant.
+        Based on the following raw web search results, construct a clean, concise, and highly structured answer to the question: "{question}"
+
+        Search Results:
+        {raw}
+
+        Follow these cleanup instructions strictly:
+        1. Extract only the factual points, specific dates, and guidelines directly answering the question.
+        2. Remove all introductory meta-sentences (e.g., "The Reserve Bank of India has issued...", "Here are the key guidelines...").
+        3. Remove all conversational filler, boilerplate text, and generic concluding sentences (e.g., "These guidelines demonstrate the RBI's commitment...").
+        4. Organize the information with clean markdown bullet points and bold section names if appropriate.
+        5. Keep the tone professional, objective, and direct.
+        """)
+    ])
+    return {"answer": response.content}
 
 
 #conditional edge functions-
@@ -178,9 +193,33 @@ builder.add_conditional_edges("retrieve_and_answer",should_web_search,
 
 
 workflow = builder.compile()
-display(Image(workflow.get_graph().draw_mermaid_png()))            
+
+def get_custom_graph_png() -> bytes:
+    """Generate the graph PNG image with conditional edges labeled by their condition function names."""
+    from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+    
+    syntax = workflow.get_graph().draw_mermaid()
+    
+    # Dynamically inject condition function names on conditional edges
+    for source_node, branches in builder.branches.items():
+        for cond_name, branch_spec in branches.items():
+            for target_node in branch_spec.ends.keys():
+                # Replace standard dotted edge with a labeled one using standard Mermaid syntax
+                old_edge = f"{source_node} -.-> {target_node};"
+                new_edge = f"{source_node} -.->|{cond_name}| {target_node};"
+                syntax = syntax.replace(old_edge, new_edge)
+                
+    return draw_mermaid_png(syntax)
 
 if __name__ == "__main__":
+    # Save the graph image locally when run directly
+    try:
+        with open("graph.png", "wb") as f:
+            f.write(get_custom_graph_png())
+        print("Graph image saved to graph.png")
+    except Exception as e:
+        print(f"Failed to save graph image: {e}")
+
     chat_history = []
 
     while True:

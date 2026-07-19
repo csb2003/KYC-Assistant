@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from agent import workflow
+from agent import workflow, get_custom_graph_png
 from langchain_core.messages import HumanMessage, AIMessage
 from fastapi import FastAPI, Response
 
@@ -34,7 +34,7 @@ def ask(request: QuestionRequest):
 @server.get("/graph")
 def get_graph():
     try:
-        png_data = workflow.get_graph().draw_mermaid_png()
+        png_data = get_custom_graph_png()
         return Response(content=png_data, media_type="image/png")
     except Exception as e:
         return {"error": str(e)}
