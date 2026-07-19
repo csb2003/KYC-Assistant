@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent import workflow
 from langchain_core.messages import HumanMessage, AIMessage
+from fastapi import FastAPI, Response
 
 
 load_dotenv()
@@ -28,3 +29,12 @@ def ask(request: QuestionRequest):
     chat_history.append(AIMessage(content=response["answer"]))
     # 4. return the answer
     return {"answer": response["answer"]}
+
+
+@server.get("/graph")
+def get_graph():
+    try:
+        png_data = workflow.get_graph().draw_mermaid_png()
+        return Response(content=png_data, media_type="image/png")
+    except Exception as e:
+        return {"error": str(e)}

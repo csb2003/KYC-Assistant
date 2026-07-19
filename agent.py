@@ -2,6 +2,7 @@ import os
 from typing import TypedDict, List
 from dotenv import load_dotenv
 from langchain_tavily import TavilySearch
+from IPython.display import Image, display
 
 # Import LangChain and LangGraph modules
 from langchain_community.document_loaders import PyPDFLoader
@@ -164,12 +165,20 @@ builder.add_node("web_search",web_search)
 
 builder.add_edge("ask_clarification", END)
 builder.add_edge("web_search",END)
-builder.add_conditional_edges("check_scope",clarify)
-builder.add_conditional_edges("retrieve_and_answer",should_web_search)
+builder.add_conditional_edges("check_scope", clarify, {
+    "ask_clarification": "ask_clarification",
+    "retrieve_and_answer": "retrieve_and_answer"
+})
+
+builder.add_conditional_edges("retrieve_and_answer",should_web_search,
+{
+    "web_search": "web_search",
+    END : END
+})
 
 
 workflow = builder.compile()
-            
+display(Image(workflow.get_graph().draw_mermaid_png()))            
 
 if __name__ == "__main__":
     chat_history = []

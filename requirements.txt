@@ -12,3 +12,4 @@ pyngrok
 langgraph
 python-dotenv
 sentence-transformers
+IPython
