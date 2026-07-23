@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KYC Assistant - AI RAG Agent</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-base: #0b0f19;
+            --bg-surface: #131b2e;
+            --bg-card: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dark: #64748b;
+            --accent-primary: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --accent-green: #10b981;
+            --border-light: #2d3748;
+            --border-focus: #4a5568;
+            --chat-user-bg: #2563eb;
+            --chat-bot-bg: #1e293b;
+            --font-display: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-base);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-dark);
+        }
+
+        /* Top Navbar */
+        header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-light);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-family: var(--font-display);
+            color: white;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .app-title {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .api-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .api-badge.offline {
+            color: #ef4444;
+            background-color: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            display: inline-block;
+        }
+
+        .api-badge.offline .status-dot {
+            background-color: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        /* Main Workspace layout */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Left Side: Chat Interface */
+        .chat-container {
+            flex: 1.8;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-base);
+            position: relative;
+            border-right: 1px solid var(--border-light);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .message {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+            animation: fadeIn 0.4s ease forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+        }
+
+        .message.bot {
+            align-self: flex-start;
+        }
+
+        .message-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .message.user .message-label {
+            align-self: flex-end;
+        }
+
+        .message-content {
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            word-break: break-word;
+        }
+
+        .message.user .message-content {
+            background-color: var(--chat-user-bg);
+            color: white;
+            border-bottom-right-radius: 2px;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.2);
+        }
+
+        .message.bot .message-content {
+            background-color: var(--chat-bot-bg);
+            color: var(--text-main);
+            border-bottom-left-radius: 2px;
+            border: 1px solid var(--border-light);
+        }
+
+        /* Suggestion chips */
+        .suggestions-wrapper {
+            padding: 0.5rem 2rem;
+            background-color: var(--bg-base);
+        }
+
+        .suggestions-title {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .suggestions-list {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .suggestion-chip {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .suggestion-chip:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: var(--accent-primary);
+            color: var(--text-main);
+            transform: translateY(-1px);
+        }
+
+        /* Chat input section */
+        .input-panel {
+            padding: 1.5rem 2rem 2rem 2rem;
+            background-color: var(--bg-base);
+        }
+
+        .input-box {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+            transition: all 0.3s ease;
+        }
+
+        .input-box:focus-within {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px var(--accent-glow), 0 8px 32px rgba(0, 0, 0, 0.24);
+        }
+
+        .chat-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-main);
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            height: 2.5rem;
+            resize: none;
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-dark);
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+            border: none;
+            color: white;
+            width: 2.75rem;
+            height: 2.75rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .send-btn:hover {
+            transform: scale(1.03);
+            filter: brightness(1.1);
+        }
+
+        .send-btn:disabled {
+            background: var(--border-light);
+            color: var(--text-dark);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Right Side: Graph/Flow Viewer */
+        .graph-container {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-surface);
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .graph-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .graph-title {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .refresh-btn {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-light);
+            color: var(--text-muted);
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .refresh-btn:hover {
+            background-color: var(--border-light);
+            color: var(--text-main);
+        }
+
+        .graph-card {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            flex: 1;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            padding: 1rem;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .graph-img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            cursor: zoom-in;
+            transition: transform 0.3s ease;
+        }
+
+        .graph-img:hover {
+            transform: scale(1.02);
+        }
+
+        .graph-explain {
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .graph-explain p {
+            margin-bottom: 0.75rem;
+        }
+
+        .graph-node-desc {
+            background-color: var(--bg-base);
+            padding: 0.75rem;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-primary);
+            margin-top: 0.5rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        /* Typing indicator animation */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px;
+        }
+
+        .typing-dot {
+            width: 7px;
+            height: 7px;
+            background-color: var(--text-muted);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+
+        /* Modal for full screen graph */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            animation: zoomIn 0.3s ease;
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.9); }
+            to { transform: scale(1); }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: var(--text-main);
+            font-size: 2rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            transition: color 0.2s ease;
+        }
+
+        .close-modal:hover {
+            color: var(--accent-primary);
+        }
+
+        /* Welcome Message Screen */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 2rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .welcome-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: pulse-glow 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-glow)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 15px var(--accent-glow)); }
+        }
+
+        .welcome-title {
+            font-family: var(--font-display);
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+        }
+
+        .welcome-desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+        }
+
+        /* Utility classes for lists and headings inside Bot Messages */
+        .message-content h2, .message-content h3, .message-content h4 {
+            margin-top: 0.75rem;
+            margin-bottom: 0.5rem;
+            color: #fff;
+            font-family: var(--font-display);
+        }
+        .message-content p {
+            margin-bottom: 0.50rem;
+        }
+        .message-content ul, .message-content ol {
+            margin-bottom: 0.75rem;
+            padding-left: 1.25rem;
+        }
+        .message-content li {
+            margin-bottom: 0.25rem;
+        }
+
+        /* Mobile Responsive adjustments */
+        @media (max-width: 900px) {
+            main {
+                flex-direction: column;
+            }
+            .chat-container {
+                flex: 1;
+                border-right: none;
+                border-bottom: 1px solid var(--border-light);
+            }
+            .graph-container {
+                display: none; /* Hide graph on mobile layout by default for simplicity */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo-section">
+            <div class="logo-icon">KYC</div>
+            <div>
+                <h1 class="app-title">KYC Assistant</h1>
+                <p style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">Retrieval-Augmented Intelligent Agent</p>
+            </div>
+        </div>
+        <!-- <div id="apiStatus" class="api-badge">
+            <span class="status-dot"></span>
+            <span id="apiStatusText">Server Online</span>
+        </div> -->
+    </header>
+
+    <!-- Main Workspace -->
+    <main>
+        
+        <!-- Left Side: Chat Container -->
+        <section class="chat-container">
+            <div id="chatMessages" class="chat-messages">
+                <!-- Welcome Screen (shown initially) -->
+                <div id="welcomeScreen" class="welcome-screen">
+                    <div class="welcome-icon">⚡</div>
+                    <h2 class="welcome-title">RBI KYC Assistant</h2>
+                    <p class="welcome-desc">
+                        I am a RAG-powered LangGraph assistant. I can answer complex questions about RBI's Master Direction on KYC guidelines (2016) and banking regulations. Ask me something to get started!
+                    </p>
+                    <div class="suggestions-list" style="justify-content: center;">
+                        <button class="suggestion-chip" onclick="applySuggestion('What are the Official Valid Documents (OVD) for KYC?')">What are the Official Valid Documents (OVD)?</button>
+                        <button class="suggestion-chip" onclick="applySuggestion('Explain the Video Customer Identification Process (V-CIP)')">What is V-CIP?</button>
+                        <button class="suggestion-chip" onclick="applySuggestion('What is the KYC requirement for a Sole Proprietorship firm?')">Sole Proprietorship KYC?</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Suggestion chips (docked above input when chat has messages) -->
+            <div id="suggestionsWrapper" class="suggestions-wrapper" style="display: none;">
+                <div class="suggestions-title">Quick Questions</div>
+                <div class="suggestions-list">
+                    <button class="suggestion-chip" onclick="applySuggestion('What are the Official Valid Documents (OVD) for KYC?')">OVD Documents</button>
+                    <button class="suggestion-chip" onclick="applySuggestion('Explain the Video Customer Identification Process (V-CIP)')">V-CIP Process</button>
+                    <button class="suggestion-chip" onclick="applySuggestion('What is the periodic updation timeframe for different risk customers?')">Periodic Updation Timeframe</button>
+                </div>
+            </div>
+
+            <!-- Input area -->
+            <div class="input-panel">
+                <div class="input-box">
+                    <input type="text" id="userInput" class="chat-input" placeholder="Ask a question about KYC or banking regulations..." onkeydown="handleKeyDown(event)">
+                    <button id="sendBtn" class="send-btn" onclick="sendMessage()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Side: Graph/Flow Viewer -->
+        <section class="graph-container">
+            <div class="graph-header">
+                <h3 class="graph-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent-primary);">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                    Agent Architecture
+                </h3>
+                <button class="refresh-btn" onclick="loadGraph()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+            
+            <div class="graph-card">
+                <img id="graphImage" class="graph-img" src="" alt="LangGraph Workflow Graph" onclick="openModal(this.src)">
+                <div id="graphLoader" style="position: absolute; display: flex; align-items: center; justify-content: center; background: rgba(19,27,46,0.8); width:100%; height:100%;">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="graph-explain">
+                <p><strong>LangGraph Workflow:</strong></p>
+                <div class="graph-node-desc">
+                    1. <strong>check_scope</strong>: Evaluates if query is related to KYC/AML/Banking.<br>
+                    2. <strong>retrieve_and_answer</strong>: If relevant, queries FAISS vector store & LLM.<br>
+                    3. <strong>web_search</strong>: If vector stores return "IDK", triggers Tavily Web Search.<br>
+                    4. <strong>ask_clarification</strong>: If query is completely irrelevant, asks for clarification.
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal for full screen graph -->
+    <div id="graphModal" class="modal" onclick="closeModal()">
+        <button class="close-modal">&times;</button>
+        <img id="modalImage" class="modal-content" src="" alt="Full Screen Workflow">
+    </div>
+
+    <!-- JavaScript Controller -->
+    <script>
+        // Automatic API Base detection
+        // If opened via file:// or other hosts, target localhost:8000 by default. Otherwise use current host.
+        const API_BASE = window.location.hostname === "" || window.location.hostname === "localhost" 
+            ? "http://localhost:8000" 
+            : window.location.origin;
+
+        // Initialize state
+        window.addEventListener('DOMContentLoaded', () => {
+            checkApiStatus();
+            loadGraph();
+        });
+
+        function checkApiStatus() {
+            const badge = document.getElementById('apiStatus');
+            const text = document.getElementById('apiStatusText');
+
+            fetch(`${API_BASE}/graph`)
+                .then(res => {
+                    if (res.ok) {
+                        badge.classList.remove('offline');
+                        text.innerText = "Server Online";
+                    } else {
+                        throw new Error();
+                    }
+                })
+                .catch(() => {
+                    badge.classList.add('offline');
+                    text.innerText = "Server Offline";
+                });
+        }
+
+        function loadGraph() {
+            const img = document.getElementById('graphImage');
+            const loader = document.getElementById('graphLoader');
+            loader.style.display = 'flex';
+
+            // Fetch graph image cache buster to avoid caching issues
+            const graphUrl = `${API_BASE}/graph?t=${new Date().getTime()}`;
+            
+            // Test image load
+            const testImg = new Image();
+            testImg.onload = () => {
+                img.src = graphUrl;
+                loader.style.display = 'none';
+            };
+            testImg.onerror = () => {
+                img.alt = "Failed to load LangGraph agent workflow image.";
+                loader.style.display = 'none';
+            };
+            testImg.src = graphUrl;
+        }
+
+        // Format Markdown text to sleek HTML structures
+        function formatMarkdown(text) {
+            if (!text) return '';
+            
+            // Escape HTML
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            
+            // Format headers
+            html = html.replace(/^### (.*$)/gim, '<h4>$1</h4>');
+            html = html.replace(/^## (.*$)/gim, '<h3>$1</h3>');
+            html = html.replace(/^# (.*$)/gim, '<h2>$1</h2>');
+            
+            // Format bold and italics
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Format bullet lists (lines starting with - or *)
+            // Group multiple lines of lists into <ul> block
+            const lines = html.split('\n');
+            let inList = false;
+            let listBuffer = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (line.startsWith('- ') || line.startsWith('* ')) {
+                    if (!inList) {
+                        inList = true;
+                        lines[i] = '<ul><li style="margin-bottom:0.25rem;">' + line.substring(2) + '</li>';
+                    } else {
+                        lines[i] = '<li style="margin-bottom:0.25rem;">' + line.substring(2) + '</li>';
+                    }
+                } else {
+                    if (inList) {
+                        inList = false;
+                        lines[i] = '</ul>' + lines[i];
+                    }
+                }
+            }
+            if (inList) {
+                lines.push('</ul>');
+            }
+            html = lines.join('\n');
+
+            // Format code blocks
+            html = html.replace(/```([\s\S]*?)```/g, '<pre style="background: #0f172a; padding: 0.75rem; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 0.85rem; border: 1px solid #2d3748; margin: 0.75rem 0; color: #38bdf8;"><code>$1</code></pre>');
+            
+            // Format inline code
+            html = html.replace(/`([^`]+)`/g, '<code style="background: #0f172a; padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace; font-size: 0.85rem; border: 1px solid #2d3748; color: #f472b6;">$1</code>');
+            
+            // Break lines
+            html = html.replace(/\n/g, '<br>');
+
+            // Clean up empty lines or duplicate breaks
+            html = html.replace(/(<br>){2,}/g, '<br><br>');
+            
+            return html;
+        }
+
+        function applySuggestion(text) {
+            document.getElementById('userInput').value = text;
+            sendMessage();
+        }
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const inputEl = document.getElementById('userInput');
+            const question = inputEl.value.trim();
+            if (!question) return;
+
+            // Clear input
+            inputEl.value = '';
+            
+            // Hide welcome screen if showing
+            const welcome = document.getElementById('welcomeScreen');
+            if (welcome) {
+                welcome.style.display = 'none';
+                document.getElementById('suggestionsWrapper').style.display = 'block';
+            }
+
+            const chatMessages = document.getElementById('chatMessages');
+
+            // 1. Add User Message to Chat
+            const userMsgEl = document.createElement('div');
+            userMsgEl.className = 'message user';
+            userMsgEl.innerHTML = `
+                <span class="message-label">You</span>
+                <div class="message-content">${formatMarkdown(question)}</div>
+            `;
+            chatMessages.appendChild(userMsgEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Disable UI while processing
+            const sendBtn = document.getElementById('sendBtn');
+            inputEl.disabled = true;
+            sendBtn.disabled = true;
+
+            // 2. Add Loading Indicator
+            const botMsgEl = document.createElement('div');
+            botMsgEl.className = 'message bot';
+            botMsgEl.innerHTML = `
+                <span class="message-label">KYC Assistant</span>
+                <div class="message-content" id="tempLoading">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(botMsgEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                // Send post request
+                const response = await fetch(`${API_BASE}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+
+                if (!response.ok) {
+                    throw new Error('API request failed');
+                }
+
+                const data = await response.json();
+                
+                // Remove loading and display actual answer
+                const tempLoading = document.getElementById('tempLoading');
+                if (tempLoading) {
+                    tempLoading.id = ''; // Remove temp id
+                    tempLoading.innerHTML = formatMarkdown(data.answer);
+                }
+            } catch (err) {
+                console.error(err);
+                const tempLoading = document.getElementById('tempLoading');
+                if (tempLoading) {
+                    tempLoading.id = '';
+                    tempLoading.innerHTML = `<span style="color: #ef4444; font-weight: 500;">Sorry, I encountered an error communicating with the server. Please verify the FastAPI application is running at ${API_BASE}.</span>`;
+                }
+                
+                // Refresh status check
+                checkApiStatus();
+            } finally {
+                // Re-enable UI
+                inputEl.disabled = false;
+                sendBtn.disabled = false;
+                inputEl.focus();
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Reload graph in case state nodes changed / conditional routing happened
+                loadGraph();
+            }
+        }
+
+        // Modal triggers
+        function openModal(src) {
+            if (!src) return;
+            const modal = document.getElementById('graphModal');
+            const modalImg = document.getElementById('modalImage');
+            modalImg.src = src;
+            modal.classList.add('show');
+        }
+
+        // Global key event to close modal on Escape
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        function closeModal() {
+            const modal = document.getElementById('graphModal');
+            modal.classList.remove('show');
+        }
+    </script>
+</body>
+</html>

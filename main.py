@@ -1,18 +1,38 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from agent import workflow, get_custom_graph_png
 from langchain_core.messages import HumanMessage, AIMessage
-from fastapi import FastAPI, Response
-
+import os
 
 load_dotenv()
 
 server = FastAPI()
+
+# Enable CORS for frontend integration
+server.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 chat_history = []
 
 class QuestionRequest(BaseModel):
     question: str
+
+
+@server.get("/", response_class=HTMLResponse)
+def read_root():
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h3>KYC Assistant Frontend - index.html not found</h3>"
 
 
 @server.post("/ask")
@@ -37,4 +57,4 @@ def get_graph():
         png_data = get_custom_graph_png()
         return Response(content=png_data, media_type="image/png")
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e)}

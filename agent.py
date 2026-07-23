@@ -102,8 +102,8 @@ def check_scope(state:AgentState):
     system_prompt = """You are a helpful assistant.
         Is this question - "{question}" related to KYC, AML, fintech, banking regulations, 
         or is it a follow-up to a previous conversation about these topics?
-        But
         Reply with only one word: RELEVANT or IRRELEVANT.
+        If its a greeting reply RELEVANT.
         When in doubt, reply RELEVANT."""
 
     response = llm.invoke([
